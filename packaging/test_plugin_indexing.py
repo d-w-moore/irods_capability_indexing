@@ -277,7 +277,7 @@ class TestIndexingPlugin(ResourceBase, unittest.TestCase):
             if isinstance(try_kill, (float,int,long_type)) and try_kill > 0.0: sleep(try_kill)
         out,_,rc = session_.run_icommand('iqstat')
         if verbose:
-          open('/tmp/dan','a').write('***\n OUT = ['+out+']***\n')
+          open('/tmp/delay-queue-debug','a').write('***\n OUT = ['+out+']***\n')
         condition = (rc == 0 and 'No delayed rules' in out)
         if soft_assert:
             self.assertTrue( condition )
