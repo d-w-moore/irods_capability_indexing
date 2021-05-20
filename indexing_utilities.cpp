@@ -263,13 +263,14 @@ namespace irods {
             const auto policy_name = operation_and_index_types_to_policy_name(
                                          _operation_type,
                                          _index_type);
-            fsp start_path{_collection_name};
 
-            auto iter_end = fsvr::recursive_collection_iterator{};
-            auto iter =  fsvr::recursive_collection_iterator{comm, start_path};
+            // schedule policy for an individual path
 
-            for (auto path = start_path; ; ++iter) {
-                const auto s = fsvr::status(comm,path);
+            auto handle_path = [&] (const auto & path_) {
+                std::string pathStr { path_ };
+                rodsLog(LOG_NOTICE, "*************** handling PATH : %s", pathStr.c_str());
+/*
+                const auto s = fsvr::status(comm,path_);
                 bool is_collection = fsvr::is_collection(s);
                 bool is_data_object = fsvr::is_data_object(s);
                 if (is_data_object || is_collection) {
@@ -277,14 +278,14 @@ namespace irods {
                         std::string resc_name;
                         if (is_data_object) {
                             resc_name = get_indexing_resource_name_for_object(
-                                                   path.string(),
+                                                   path_.string(),
                                                    indexing_resources);
                         }
                         if ( ! (is_collection && _index_type == "full_text" )) {
 
                             schedule_policy_event_for_object(
                                 policy_name,
-                                path.string(),
+                                path_.string(),
                                 _user_name,
                                 EMPTY_RESOURCE_NAME,
                                 _indexer,
@@ -297,12 +298,23 @@ namespace irods {
                         rodsLog(
                             LOG_ERROR,
                             "failed to find indexing resource for object [%s]",
-                            path.string().c_str());
+                            path_.string().c_str());
                     }
-                    if (iter != iter_end) { path = iter->path(); }
-                                     else { break; }
                 } // if collection or data object
-            } // for path
+*/
+            };
+
+            // Schedule policy for each subordinate path of the collection
+
+            fsp start_path{_collection_name};
+            auto iter_end = fsvr::recursive_collection_iterator{};
+            auto iter =  fsvr::recursive_collection_iterator{comm, start_path};
+            handle_path(start_path);
+            for (const auto & obj : iter)
+            {
+                handle_path(obj.path());
+            }
+
         } // schedule_policy_events_for_collection
 
         /*
