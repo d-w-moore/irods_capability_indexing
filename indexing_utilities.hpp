@@ -135,6 +135,7 @@ namespace irods {
 
             public: const configuration& get_config() { return config_; }
         }; // class indexer
+
     } // namespace indexing
 } // namespace irods
 

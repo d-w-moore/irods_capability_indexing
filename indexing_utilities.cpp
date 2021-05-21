@@ -433,6 +433,7 @@ namespace irods {
                         const auto& indexer = row.second;
                         std::string index_name, index_type;
                         std::tie(index_name, index_type) = parse_indexer_string(indexer_string);
+                        // dedupe the processed indices before launching jobs
                         if(_index_type == index_type) {
                             auto itr = std::find(
                                            std::begin(processed_indicies),

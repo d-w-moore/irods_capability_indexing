@@ -48,13 +48,6 @@ namespace {
     std::unique_ptr<irods::indexing::configuration>     config;
     std::map<int, std::tuple<std::string, std::string>> opened_objects;
 
-    std::map < std::string,
-               std::vector < std::tuple < std::string, // id of   (sub-)coll
-                                          std::string, // path of (sub-)coll
-                                          std::string, /*A*/
-                                          std::string, /*V*/
-                                          std::string  /*U*/ >>> avus_to_purge;
-
     const char* rm_force_kw = "*";
 
     std::tuple<int, std::string>
@@ -322,8 +315,9 @@ namespace {
                                 units);
                     }
                 }
-            }
-            else if("pep_api_data_obj_unlink_pre" == _rn) {
+            } // pep_api_mod_avu_metadata_post
+            else
+            if("pep_api_data_obj_unlink_pre" == _rn) {
                 auto it = _args.begin();
                 std::advance(it, 2);
                 if(_args.end() == it) {
@@ -362,17 +356,17 @@ namespace {
             }
             else if("pep_api_rm_coll_post"  == _rn) {
                 if ('*' != rm_force_kw[0]) { /* there was a force keyword */
-		    auto it = _args.begin();
-		    std::advance(it, 2);
-		    if(_args.end() == it) {
-			THROW(
-			    SYS_INVALID_INPUT_PARAM,
-			    "invalid number of arguments");
-		    }
-		    CollInp* obj_inp = nullptr;
-		    obj_inp = boost::any_cast<CollInp*>(*it);
-		    irods::indexing::indexer idx{_rei, config->instance_name_};
-		    idx.schedule_metadata_purge_for_recursive_rm_object (  obj_inp->collName );
+                    auto it = _args.begin();
+                    std::advance(it, 2);
+                    if(_args.end() == it) {
+                        THROW(
+                            SYS_INVALID_INPUT_PARAM,
+                            "invalid number of arguments");
+                    }
+                    CollInp* obj_inp = nullptr;
+                    obj_inp = boost::any_cast<CollInp*>(*it);
+                    irods::indexing::indexer idx{_rei, config->instance_name_};
+                    idx.schedule_metadata_purge_for_recursive_rm_object (  obj_inp->collName );
                 }
             }
         }
