@@ -44,6 +44,32 @@ int _delayExec(
 
 namespace {
 
+    bool delay_task_exists( ruleExecInfo_t* _rei
+                           ,std::string obj_name
+                           ,nlohmann::json* j_out=nullptr
+                           ,std::string policy_name = "")
+    {
+            bool found {false};
+            using json = nlohmann::json;
+            std::string query_str = boost::str(boost::format(
+                                        "select RULE_EXEC_ID, RULE_EXEC_NAME, RULE_EXEC_TIME where RULE_EXEC_NAME like '%%%s%%'"
+                                                // dwm TODO : prb need more specific
+                                    ) % obj_name);
+            irods::query<rsComm_t> qobj{_rei->rsComm, query_str};
+            for (const auto& result : qobj) {
+                auto j = json::parse( result[1] );
+                auto it = j.find("rule-engine-operation");
+                if ((policy_name == "") || (it != j.end() && std::string{*it} == policy_name))
+                {
+                    found = true;
+                    if (j_out) *j_out = j;
+                    break;
+                }
+
+            }
+            return found;
+    }
+
     bool collection_metadata_is_new = false;
     std::unique_ptr<irods::indexing::configuration>     config;
     std::map<int, std::tuple<std::string, std::string>> opened_objects;
@@ -305,8 +331,11 @@ namespace {
                             }
                         }
                     }
-                    if(type == data_object ||
-                       (type == collection && config->index != attribute)) {
+                    if(type == data_object || (type == collection && config->index != attribute)) {
+                        nlohmann::json j;
+                        bool actv = delay_task_exists( _rei, logical_path, &j ); //dwm
+                        rodsLog(LOG_NOTICE,"dwm - %s", "active job -- ? ");
+                        rodsLog(LOG_NOTICE,"    - %s", !actv ? "<false>": j.dump().c_str());
                         idx.schedule_metadata_indexing_event(
                                 logical_path,
                                 _rei->rsComm->clientUser.userName,
@@ -742,6 +771,8 @@ irods::error exec_rule_expression(
                     user_name.c_str(),
                     NAME_LEN);
 
+rodsLog(LOG_NOTICE,"%d",int());
+//dwm
                 apply_metadata_policy(
                     rei,
                     irods::indexing::policy::metadata::index,
