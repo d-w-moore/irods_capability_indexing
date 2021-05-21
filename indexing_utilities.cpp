@@ -269,7 +269,6 @@ namespace irods {
             auto handle_path = [&] (const auto & path_) {
                 std::string pathStr { path_ };
                 rodsLog(LOG_NOTICE, "*************** handling PATH : %s", pathStr.c_str());
-/*
                 const auto s = fsvr::status(comm,path_);
                 bool is_collection = fsvr::is_collection(s);
                 bool is_data_object = fsvr::is_data_object(s);
@@ -301,7 +300,6 @@ namespace irods {
                             path_.string().c_str());
                     }
                 } // if collection or data object
-*/
             };
 
             // Schedule policy for each subordinate path of the collection
