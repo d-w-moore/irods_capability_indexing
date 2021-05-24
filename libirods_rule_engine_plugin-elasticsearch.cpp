@@ -34,6 +34,7 @@
 #include <boost/archive/iterators/transform_width.hpp>
 #include <boost/archive/iterators/ostream_iterator.hpp>
 
+#include <set>
 #include <string>
 #include <sstream>
 #include <algorithm>
@@ -215,6 +216,36 @@ namespace {
     std::string object_purge_policy;
     std::string metadata_index_policy;
     std::string metadata_purge_policy;
+
+    void get_elasticsearch_indices_for_collection(rsComm_t & comm_, const std::string & coll, std::set<std::string>& indices)
+    {
+            std::string INDICATOR =  "irods::indexing::index";
+            std::string SEP =  "::";
+            std::string query_str = boost::str( boost::format(
+                                                "SELECT META_COLL_ATTR_VALUE WHERE META_COLL_ATTR_NAME = '%s' and "
+                                                "META_COLL_ATTR_UNITS = 'elasticsearch' and COLL_NAME = '%s'") % INDICATOR % coll);
+            irods::query<rsComm_t> qobj{&comm_, query_str};
+            for(const auto& row : qobj) {
+                auto offs = row[0].find(SEP);
+                if (offs != 0 && offs != std::string::npos) { indices.insert(row[0].substr(0,offs)); }
+            }
+    }
+
+    auto elasticsearch_indices( rsComm_t & comm_, const std::string & objname) {
+        namespace fs = irods::experimental::filesystem;
+        namespace fsvr = fs::server;
+        auto logical = fs::path {objname};
+        const auto s = fsvr::status(comm_, logical);
+        bool is_coll = fsvr::is_collection(s);
+        std::set<std::string> indices_out;
+        while(!logical.empty()) {
+            if (is_coll) get_elasticsearch_indices_for_collection( comm_, logical.string(), indices_out );
+            if (0 == logical.compare(logical.root_collection())) { break; }
+            logical = logical.parent_path();
+            is_coll = true;
+        }
+        return indices_out;
+    }
 
     void apply_document_type_policy(
         ruleExecInfo_t*    _rei,
@@ -514,6 +545,10 @@ namespace {
 
     } // get_metadata_index_id
 
+
+
+//  DWM -- must modify the below routine for the new schema.
+
     void invoke_indexing_event_metadata(
         ruleExecInfo_t*    _rei,
         const std::string& _object_path,
@@ -773,7 +808,6 @@ irods::error exec_rule(
                                     boost::replace_all ( path_,  "?" , "\\?");
                                     boost::replace_all ( path_,  "*" , "\\*");
                                     return path_; }) (coll_path);
-            // -- "wildcard" must be used even for the exact-path match as delete_by_query evidently won't support "match"
             std::string JtopLevel   = json::parse(
                                           boost::str(boost::format( R"JSON({"query":{"wildcard":{"object_path":{"value":"%s"}}}})JSON") % escaped_path.c_str())
                                       ).dump();
@@ -784,16 +818,9 @@ irods::error exec_rule(
             for (const std::string & endpt : config->hosts_) {
                 try {
                     std::string base_URL { endpt };
-                    base_URL.erase(base_URL.find_last_not_of("/")+1);  // get rid of trailing slash(es)
-                    auto get_indices_URL { base_URL + "/_cat/indices" };
-                    cpr::Response r_ind = cpr::Get(cpr::Url{ get_indices_URL }, cpr::Parameters{{"format", "json"}});
-                    std::vector<std::string> indices;
-                    std::string json_to_parse{ r_ind.text };
-                    auto response_array = json::parse( std::string{json_to_parse} );
-                    std::for_each( response_array.cbegin(),
-                                   response_array.cend(), [&indices](const auto &e){indices.push_back(e["index"]);} );
-                    for (const auto & e : indices) {
-                        const std::string del_by_qu_URL { base_URL + "/" + e + "/_delete_by_query" } ;
+                    auto indices = elasticsearch_indices(*rei->rsComm, coll_path); // TODO : if not always a collection , consider renaming
+                    for (const auto & index : indices) {
+                        const std::string del_by_qu_URL { base_URL + "/" + index + "/_delete_by_query" } ;
                         for (const std::string &json_out  :{JtopLevel,JsubObject}) {
                             if (json_out == "") { continue; }
                             auto r = cpr::Post(cpr::Url{del_by_qu_URL},

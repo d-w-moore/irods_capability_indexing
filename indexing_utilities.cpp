@@ -387,7 +387,8 @@ namespace irods {
         /*
         == //// void indexer::schedule_policy_events_given_object_path ////
         == Given an object path (data object or collection) and an operation name
-        == recurse  upward to find the indices for which policy events must be scheduled
+        == search upward in collection hierarchy to find the index types and names
+        == for which policy events must be scheduled
          */
 
         void indexer::schedule_policy_events_given_object_path(

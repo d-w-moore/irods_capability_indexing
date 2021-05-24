@@ -345,8 +345,8 @@ namespace {
                     }
                 }
             } // pep_api_mod_avu_metadata_post
-            else
-            if("pep_api_data_obj_unlink_pre" == _rn) {
+
+            else if("pep_api_data_obj_unlink_pre" == _rn) {
                 auto it = _args.begin();
                 std::advance(it, 2);
                 if(_args.end() == it) {
@@ -357,6 +357,7 @@ namespace {
                 const auto obj_inp = boost::any_cast<dataObjInp_t*>(*it);
                 if (auto* p = getValByKey( &obj_inp->condInput, FORCE_FLAG_KW); p != 0) { rm_force_kw = p; }
             }
+
             else if("pep_api_data_obj_unlink_post" == _rn) {
                 auto it = _args.begin();
                 std::advance(it, 2);
@@ -368,9 +369,10 @@ namespace {
                 const auto obj_inp = boost::any_cast<dataObjInp_t*>(*it);
                 if ('*' != rm_force_kw[0]) { /* there was a force keyword */
                     irods::indexing::indexer idx{_rei, config->instance_name_};
-                    idx.schedule_metadata_purge_for_recursive_rm_object (  obj_inp->objPath , false);
+                    idx.schedule_metadata_purge_for_recursive_rm_object( obj_inp->objPath, false );
                 }
             }
+
             else if("pep_api_rm_coll_pre"  == _rn) {
                 auto it = _args.begin();
                 std::advance(it, 2);
@@ -383,6 +385,7 @@ namespace {
                 obj_inp = boost::any_cast<CollInp*>(*it);
                 if (auto* p = getValByKey( &obj_inp->condInput, FORCE_FLAG_KW); p != 0) { rm_force_kw = p; }
             }
+
             else if("pep_api_rm_coll_post"  == _rn) {
                 if ('*' != rm_force_kw[0]) { /* there was a force keyword */
                     auto it = _args.begin();
@@ -772,7 +775,9 @@ irods::error exec_rule_expression(
                     NAME_LEN);
 
 rodsLog(LOG_NOTICE,"%d",int());
-//dwm
+/**
+ --  we call from here into the appropriate index technology plugin to index AVUs
+**/
                 apply_metadata_policy(
                     rei,
                     irods::indexing::policy::metadata::index,
