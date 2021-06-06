@@ -772,6 +772,8 @@ irods::error exec_rule(
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
 
+// these two will be the same routine
+/* dwm */
             invoke_indexing_event_metadata(
                 rei,
                 object_path,
@@ -787,7 +789,7 @@ irods::error exec_rule(
             const std::string value{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
-
+/* dwm */
             invoke_purge_event_metadata(
                 rei,
                 object_path,
