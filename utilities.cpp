@@ -4,6 +4,9 @@
 
 namespace irods {
     namespace indexing {
+
+        // -=-=-= exception and error reporting
+
         void exception_to_rerror(
             const irods::exception& _exception,
             rError_t&               _error) {
@@ -42,6 +45,9 @@ namespace irods {
             }
             return ss.str();
         } // collapse_error_stack
+
+
+        // -=-=-=-= invoke policy(action) by name
 
         void invoke_policy(
             ruleExecInfo_t*       _rei,

@@ -579,7 +579,8 @@ namespace {
         const std::string& _attribute,
         const std::string& _value,
         const std::string& _unit,
-        const std::string& _index_name) {
+        const std::string& _index_name, const nlohmann::json & = {} )
+    {
 
         try {
             elasticlient::Client client{config->hosts_};
@@ -759,7 +760,12 @@ irods::error exec_rule(
                 attribute,
                 value,
                 unit,
-                index_name);
+                index_name
+
+// ,{ { "xa", "dude" }, } // - dwm -- or
+// ,nlohmann::json::parse(<inp_parm>) // -> holds object sys metadata
+
+            );
 
         }
         else if(_rn == "irods_policy_recursive_rm_object_by_path") {

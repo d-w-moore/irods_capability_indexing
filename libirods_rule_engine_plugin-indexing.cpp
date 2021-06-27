@@ -25,6 +25,7 @@
 #include <tuple>
 #include <string>
 #include <fmt/format.h>
+#include <irods_log.hpp>
 
 // =-=-=-=-=-=-=-
 // boost includes
@@ -46,18 +47,18 @@ int _delayExec(
 
 namespace {
 
+    // objects with visibility in this module only
+
     bool collection_metadata_is_new = false;
     std::unique_ptr<irods::indexing::configuration>     config;
     std::map<int, std::tuple<std::string, std::string>> opened_objects;
 
-    std::map < std::string,
-               std::vector < std::tuple < std::string, // id of   (sub-)coll
-                                          std::string, // path of (sub-)coll
-                                          std::string, /*A*/
-                                          std::string, /*V*/
-                                          std::string  /*U*/ >>> avus_to_purge;
+    const char* rm_force_kw = "*"; // default value tested for in "*_post" PEPs
 
-    const char* rm_force_kw = "*";
+    // -=-=-=  Search for objPath, return L1 desc, Resource name
+    // -
+    // - get_index_and_resource(const dataObjInp_t* _inp) 
+    // -
 
     std::tuple<int, std::string>
     get_index_and_resource(const dataObjInp_t* _inp) {
@@ -92,6 +93,12 @@ namespace {
     } // get_object_path_and_resource
 
 #define NULL_PTR_GUARD(x) ((x) == nullptr ? "" : (x))
+
+    // -
+    // -=-=-=  For the various PEP's , setup, schedule and/or initiate indexing policy
+    // -
+    // - apply_indexing_policy (const dataObjInp_t* _inp) 
+    // -
 
     void apply_indexing_policy(
         const std::string &    _rn,
@@ -351,6 +358,13 @@ namespace {
                 }
             }
             else if("pep_api_rm_coll_pre"  == _rn) {
+                /**
+                  *   argument spec : 
+                  *     <ignored>  <ignored>  <CollInp*> [...?]
+                  *
+                  *   before a collection is deleted. record whether FORCE_FLAG_KW is used.
+                  *
+                  **/
                 auto it = _args.begin();
                 std::advance(it, 2);
                 if(_args.end() == it) {
@@ -363,6 +377,15 @@ namespace {
                 if (auto* p = getValByKey( &obj_inp->condInput, FORCE_FLAG_KW); p != 0) { rm_force_kw = p; }
             }
             else if("pep_api_rm_coll_post"  == _rn) {
+
+                /**
+                  *   argument spec :
+                  *     <ignored>  <ignored>  <CollInp*> [...?]
+                  *
+                  *   collection has been deleted successfully. If FORCE_FLAG_KW was used, then purge the
+                  *   from the relevant indexes collection recursively
+                  */
+
                 if ('*' != rm_force_kw[0]) { /* there was a force keyword */
 		    auto it = _args.begin();
 		    std::advance(it, 2);
@@ -378,6 +401,7 @@ namespace {
                 }
             }
             else if (_rn == "pep_api_atomic_apply_metadata_operations_post") {
+/** debug - print out C++ types in list **/
 		    auto it = _args.begin();
                     while (it != _args.end()) {
                       auto ty = (it++)->type().name();
@@ -393,6 +417,14 @@ namespace {
                     % __FUNCTION__ % _rn));
         }
     } // apply_indexing_policy
+
+    // -=-=-=-= Invoke policy on object. uses
+    // -
+    // - apply_object_policy (root, obj_path, src_resc, indexer, index_name, index_type)
+    // -
+    // - (1) Composes a policy name from (root , indexer)
+    // - (2) Invokes the policy by that name upon (obj_path, src_resc, index_name, index_type) 
+    // -
 
     void apply_object_policy(
         ruleExecInfo_t*    _rei,
@@ -457,16 +489,19 @@ namespace {
             namespace fs   = irods::experimental::filesystem;
             namespace fsvr = irods::experimental::filesystem::server;
             const auto s = fsvr::status(*_rei->rsComm,  fs::path{_object_path});
+            
 
             if (fsvr::is_data_object(s)) {
                 query_str =  boost::str(
-                    boost::format("SELECT META_DATA_ATTR_NAME, META_DATA_ATTR_VALUE, META_DATA_ATTR_UNITS WHERE DATA_NAME = '%s' AND COLL_NAME = '%s'")
+                    boost::format("SELECT META_DATA_ATTR_NAME, META_DATA_ATTR_VALUE, META_DATA_ATTR_UNITS, DATA_ID"
+                                  " WHERE DATA_NAME = '%s' AND COLL_NAME = '%s'")
                         % data_name
                         % coll_name);
             }
             else if (fsvr::is_collection(s)) {
                 query_str =  boost::str(
-                    boost::format("SELECT META_COLL_ATTR_NAME, META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS WHERE COLL_NAME = '%s' ")
+                    boost::format("SELECT META_COLL_ATTR_NAME, META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS, COLL_ID "
+                                  "WHERE COLL_NAME = '%s' ")
                         % _object_path);
             }
             else {
@@ -474,7 +509,14 @@ namespace {
                 return;
             }
 
+            static bool new_schema = 1;
+
+            "DATA_ID, COLL_MODIFY_TIME, COLL_SIZE ", // -- dwm --
+            "COLL_ID, DATA_MODIFY_TIME, DATA_SIZE ";
+
             irods::query<rsComm_t> qobj{_rei->rsComm, query_str};
+
+            // - dwm - 
 
             for (const auto& result : qobj) {
                 if (config->index == result[0] && fsvr::is_collection(s)) { continue; }
@@ -682,6 +724,9 @@ irods::error exec_rule_expression(
                     user_name.c_str(),
                     NAME_LEN);
 
+                // - implement (full-text?) indexing on an individual object 
+                // -     as a delayed task.
+                // -
                 apply_object_policy(
                     rei,
                     irods::indexing::policy::object::index,
@@ -708,6 +753,9 @@ irods::error exec_rule_expression(
                     user_name.c_str(),
                     NAME_LEN);
 
+                // - implement index purge on an individual object 
+                // -    as a delayed task.
+                // -
                 apply_object_policy(
                     rei,
                     irods::indexing::policy::object::purge,
@@ -727,6 +775,9 @@ irods::error exec_rule_expression(
         else if(irods::indexing::policy::collection::index ==
                 rule_obj["rule-engine-operation"]) {
 
+            // - launch delayed task to handle indexing events under a collection
+            // -   ( example : a new indexing AVU was placed on the collection )
+            // -
             irods::indexing::indexer idx{rei, config->instance_name_};
             idx.schedule_policy_events_for_collection(
                 irods::indexing::operation_type::index,
@@ -739,6 +790,9 @@ irods::error exec_rule_expression(
         else if(irods::indexing::policy::collection::purge ==
                 rule_obj["rule-engine-operation"]) {
 
+            // - launch delayed task to handle indexing events under a collection
+            // -   ( example : an indexing AVU was removed from the collection )
+            // -
             irods::indexing::indexer idx{rei, config->instance_name_};
             idx.schedule_policy_events_for_collection(
                 irods::indexing::operation_type::purge,

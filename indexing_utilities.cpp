@@ -43,6 +43,8 @@ namespace irods {
             , config_(_instance_name) {
         } // indexer
 
+        // -=-=-=-=  Launch a new delayed task to execute index or purge operation
+        // -   
         void indexer::schedule_indexing_policy(
             const std::string& _json,
             const std::string& _params) {
@@ -58,6 +60,8 @@ namespace irods {
             }
         } // schedule_indexing_policy
 
+        // -=-=-=-= Does the given AVU exist on the collection of the given name?
+        // -
         bool indexer::metadata_exists_on_collection(
             const std::string& _collection_name,
             const std::string& _attribute,
@@ -66,10 +70,10 @@ namespace irods {
             try {
                 std::string query_str {
                     boost::str(
-                            boost::format("SELECT META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS WHERE META_COLL_ATTR_NAME = '%s' and COLL_NAME = '%s'") %
-                            _attribute %
-                            _collection_name) };
+                        boost::format("SELECT META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS WHERE META_COLL_ATTR_NAME = '%s' "
+                                      "and COLL_NAME = '%s'") % _attribute % _collection_name) };
                 query<rsComm_t> qobj{rei_->rsComm, query_str, 1};
+
                 if(qobj.size() == 0) {
                     return false;
                 }
@@ -241,12 +245,10 @@ namespace irods {
                                 generate_delay_execution_parameters());
         }
 
-        /*
-        == ////  void indexer::schedule_policy_events_for_collection  ////
-        == Starting at _collection_name , recurse over every sub-element of the tree
-        == (including data objects and collections and starting with the root).
-        == Call schedule_policy_event_for_object for every object or collection
-         */
+        // - Starting at _collection_name , recurse over every sub-element of the tree
+        // - (including data objects and collections and starting with the root).
+        // - Call schedule_policy_event_for_object for every object or collection
+        // -
         void indexer::schedule_policy_events_for_collection(
             const std::string& _operation_type,
             const std::string& _collection_name,
@@ -374,12 +376,10 @@ namespace irods {
 
         } // schedule_metadata_purge_event
 
-        /*
-        == //// void indexer::schedule_policy_events_given_object_path ////
-        == Given an object path (data object or collection) and an operation name
-        == recurse  upward to find the indices for which policy events must be scheduled
-         */
-
+        // - Given an object path (data object or collection) and an operation type,
+        // - ascend collection hierarchy to find the indices for which policy events
+        // - must be scheduled on the given object path
+        // -
         void indexer::schedule_policy_events_given_object_path(
             const std::string& _operation_type,
             const std::string& _index_type,
