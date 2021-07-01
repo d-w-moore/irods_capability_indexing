@@ -17,6 +17,7 @@
 #define IRODS_FILESYSTEM_ENABLE_SERVER_SIDE_API
 #include "filesystem.hpp"
 
+
 #include "cpr/api.h"
 #include "cpr/response.h"
 #include "elasticlient/client.h"
@@ -24,6 +25,7 @@
 #include "elasticlient/logging.h"
 
 #include <boost/any.hpp>
+#include <fmt/format.h>
 #include <boost/format.hpp>
 #include <boost/algorithm/string.hpp>
 #include <boost/uuid/uuid.hpp>
