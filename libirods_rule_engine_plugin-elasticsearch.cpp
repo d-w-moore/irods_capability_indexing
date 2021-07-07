@@ -12,11 +12,13 @@
 #include "irods_hasher_factory.hpp"
 #include "MD5Strategy.hpp"
 #include "json.hpp"
+#include "irods_log.hpp"
 
 #include "transport/default_transport.hpp"
 #define IRODS_FILESYSTEM_ENABLE_SERVER_SIDE_API
 #include "filesystem.hpp"
 
+#include "fmt/format.h"
 #include "cpr/api.h"
 #include "cpr/response.h"
 #include "elasticlient/client.h"
@@ -520,7 +522,10 @@ namespace {
         const std::string& _attribute,
         const std::string& _value,
         const std::string& _unit,
-        const std::string& _index_name) {
+        const std::string& _index_name,
+        const nlohmann::json & obj_meta ) {
+
+        irods::log( LOG_NOTICE , fmt::format("DWM - json imported {}",obj_meta.dump()) );
 
         try {
             elasticlient::Client client{config->hosts_};
@@ -705,6 +710,7 @@ irods::error exec_rule(
         return err;
     }
 
+    using nlohmann::json;
     try {
         if(_rn == object_index_policy) {
             auto it = _args.begin();
@@ -737,6 +743,7 @@ irods::error exec_rule(
             const std::string value{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
+            const std::string obj_meta { boost::any_cast<std::string>(*it) }; ++it;
 
             invoke_indexing_event_metadata(
                 rei,
@@ -744,7 +751,9 @@ irods::error exec_rule(
                 attribute,
                 value,
                 unit,
-                index_name);
+                index_name,
+                json::parse(obj_meta)
+            );
         }
         else if(_rn == metadata_purge_policy) {
             auto it = _args.begin();
@@ -753,6 +762,7 @@ irods::error exec_rule(
             const std::string value{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
+            const std::string obj_meta { boost::any_cast<std::string>(*it) }; ++it;
 
             invoke_purge_event_metadata(
                 rei,
@@ -760,11 +770,8 @@ irods::error exec_rule(
                 attribute,
                 value,
                 unit,
-                index_name
-
-// ,{ { "xa", "dude" }, } // - dwm -- or
-// ,nlohmann::json::parse(<inp_parm>) // -> holds object sys metadata
-
+                index_name,
+                json::parse(obj_meta)
             );
 
         }

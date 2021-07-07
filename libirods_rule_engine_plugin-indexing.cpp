@@ -39,6 +39,8 @@
 #include "objDesc.hpp"
 extern l1desc_t L1desc[NUM_L1_DESC];
 
+static bool new_schema = true;
+
 int _delayExec(
     const char *inActionCall,
     const char *recoveryActionCall,
@@ -468,6 +470,56 @@ namespace {
 
 /***********/
 
+    auto get_system_metadata( ruleExecInfo_t* _rei, const std::string& _obj_path )-> nlohmann::json {
+
+        using nlohmann::json;
+        const boost::filesystem::path p{_obj_path};
+        const std::string parent_name = p.parent_path().string();
+        const std::string name = p.filename().string();
+        namespace fs   = irods::experimental::filesystem;
+        namespace fsvr = irods::experimental::filesystem::server;
+        auto irods_path = fs::path{_obj_path};
+        const auto s = fsvr::status(*_rei->rsComm, irods_path);
+        std::string query_str;
+
+        json obj;
+
+        obj["abs"] = _obj_path;
+
+        if (fsvr::is_data_object(s)) {
+            query_str = fmt::format("SELECT DATA_ID , DATA_MODIFY_TIME, DATA_ZONE_NAME, COLL_NAME, DATA_SIZE where DATA_NAME = '{0}'"
+                                    " and COLL_NAME = '{1}' ", name, parent_name  );
+            irods::query<rsComm_t> qobj{_rei->rsComm, query_str, 1};
+            for (const auto & i:qobj) {
+                obj["_id"] = i[0];
+                obj["modify_time"] = std::stol( i[1] ) * 1000; // epoch ms
+                obj["zoneName"] = i[2];
+                obj["parentPath"] = i[3];
+                obj["dataSize"] = std::stol( i[4] );
+                obj["isFile"] = true;
+                break;
+            }
+        }
+        else if (fsvr::is_collection(s)) {
+            query_str = fmt::format("SELECT COLL_ID , COLL_MODIFY_TIME, COLL_ZONE_NAME, COLL_PARENT_NAME where COLL_NAME = '{0}'"
+                                    " and COLL_PARENT_NAME = '{1}' ", _obj_path, parent_name  );
+            irods::query<rsComm_t> qobj{_rei->rsComm, query_str, 1};
+            for (const auto & i : qobj) {
+                obj["_id"] =  i[0];
+                obj["lastModifiedDate"] = std::stol( i[1] ) * 1000; // epoch ms
+                obj["zone"] = i[2];
+                obj["parentPath"] = i[3];
+                obj["dataSize"] = 0L;
+                obj["isFile"] = false;
+                break;
+            }
+        }
+        obj ["fileName"] = irods_path.object_name();
+        obj ["mimeType"] = "";
+        obj ["url"] = "";
+        return obj;
+    }
+
     void apply_metadata_policy(
         ruleExecInfo_t*    _rei,
         const std::string& _policy_root,
@@ -476,10 +528,12 @@ namespace {
         const std::string& _index_name,
         const std::string& _attribute,
         const std::string& _value,
-        const std::string& _units) {
-        const std::string policy_name{irods::indexing::policy::compose_policy_name(
-                              _policy_root,
-                              _indexer)};
+        const std::string& _units)
+    {
+        const std::string policy_name { irods::indexing::policy::compose_policy_name(
+                                          _policy_root,
+                                          _indexer)     };
+
 
         if(_attribute.empty() && _value.empty()) {
             const boost::filesystem::path p{_object_path};
@@ -509,10 +563,11 @@ namespace {
                 return;
             }
 
-            static bool new_schema = 1;
+            nlohmann::json J_obj_meta {};
 
-            "DATA_ID, COLL_MODIFY_TIME, COLL_SIZE ", // -- dwm --
-            "COLL_ID, DATA_MODIFY_TIME, DATA_SIZE ";
+            if (new_schema) {
+                 J_obj_meta = get_system_metadata(_rei, _object_path);
+            }
 
             irods::query<rsComm_t> qobj{_rei->rsComm, query_str};
 
@@ -526,6 +581,8 @@ namespace {
                 args.push_back(boost::any(result[1]));
                 args.push_back(boost::any(result[2]));
                 args.push_back(boost::any(_index_name));
+                args.push_back(boost::any(J_obj_meta.dump()));
+
                 irods::indexing::invoke_policy(_rei, policy_name, args);
             }
         }
@@ -536,6 +593,8 @@ namespace {
             args.push_back(boost::any(_value));
             args.push_back(boost::any(_units));
             args.push_back(boost::any(_index_name));
+// json blob
+
             irods::indexing::invoke_policy(_rei, policy_name, args);
         }
     } // apply_metadata_policy

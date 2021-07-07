@@ -318,12 +318,14 @@ namespace irods {
             const std::string& _object_path,
             const std::string& _user_name,
             const std::string& _source_resource) {
+
             schedule_policy_events_given_object_path(
                 irods::indexing::operation_type::index,
                 irods::indexing::index_type::full_text,
                 _object_path,
                 _user_name,
                 _source_resource);
+
         } // schedule_full_text_indexing_event
 
         void indexer::schedule_full_text_purge_event(
