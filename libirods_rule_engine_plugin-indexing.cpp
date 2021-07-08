@@ -37,6 +37,8 @@
 #include "json.hpp"
 
 #include "objDesc.hpp"
+
+
 extern l1desc_t L1desc[NUM_L1_DESC];
 
 static bool new_schema = true;
@@ -445,7 +447,9 @@ namespace {
         args.push_back(boost::any(_source_resource));
         args.push_back(boost::any(_index_name));
         args.push_back(boost::any(_index_type));
+TRACE_LOG();
         irods::indexing::invoke_policy(_rei, policy_name, args);
+
 
     } // apply_object_policy
 
@@ -464,6 +468,7 @@ namespace {
         args.push_back(boost::any(_index_name));
         args.push_back(boost::any(_index_type));
 
+TRACE_LOG();
         irods::indexing::invoke_policy(_rei, _policy_name, args);
 
     } // apply_specific_policy
@@ -581,8 +586,26 @@ namespace {
                 args.push_back(boost::any(result[1]));
                 args.push_back(boost::any(result[2]));
                 args.push_back(boost::any(_index_name));
-                args.push_back(boost::any(J_obj_meta.dump()));
 
+                //std::string sendIt { J_obj_meta.dump() };
+                //args.push_back(boost::any(sendIt));
+
+                args.push_back(boost::any( std::string {   "{}"  } ));
+
+                int argNo = 0;
+                
+                try{
+                    for (const auto & x: args)  {
+                       rodsLog(LOG_NOTICE,"\t arg  %d in func %s -> %s ", ++ argNo, __func__ , boost::any_cast<const std::string&>(x).c_str());
+                    }
+                } catch (... ) { 
+                       rodsLog(LOG_NOTICE," ........... something wrong in translation");
+                }
+
+
+                rodsLog(LOG_NOTICE,"--- DWM  ---- DEBUG policy_name - [%s] - ", policy_name.c_str());
+
+TRACE_LOG();
                 irods::indexing::invoke_policy(_rei, policy_name, args);
             }
         }
@@ -595,6 +618,20 @@ namespace {
             args.push_back(boost::any(_index_name));
 // json blob
 
+                //args.push_back(boost::any( std::string {   "{}"  } ));
+                //std::string dump { get_system_metadata(_rei, _object_path).dump() };
+                args.push_back(boost::any( std::string {  get_system_metadata(_rei, _object_path).dump()  } ));
+
+                int argNo = 0;
+                
+TRACE_LOG();
+                try{
+                    for (const auto & x: args)  {
+                       rodsLog(LOG_NOTICE,"\t arg  %d in func %s -> %s ", ++ argNo, __func__ , boost::any_cast<const std::string&>(x).c_str());
+                    }
+                } catch (... ) { 
+                       rodsLog(LOG_NOTICE," ........... something wrong in translation");
+                }
             irods::indexing::invoke_policy(_rei, policy_name, args);
         }
     } // apply_metadata_policy

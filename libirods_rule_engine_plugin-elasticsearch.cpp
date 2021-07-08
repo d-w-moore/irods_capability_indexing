@@ -40,6 +40,7 @@
 #include <sstream>
 #include <algorithm>
 
+
 namespace {
 
     using string_t = std::string;
@@ -231,6 +232,7 @@ namespace {
         std::string policy_name = irods::indexing::policy::compose_policy_name(
                                   irods::indexing::policy::prefix,
                                   "document_type_elastic");
+TRACE_LOG();
         irods::indexing::invoke_policy(_rei, policy_name, args);
 
     } // apply_document_type_policy
@@ -743,7 +745,11 @@ irods::error exec_rule(
             const std::string value{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
-            const std::string obj_meta { boost::any_cast<std::string>(*it) }; ++it;
+            if (it == _args.end()) {
+                  rodsLog( LOG_NOTICE, "!!!!!!!!!!!!!!!!!!!!!!111 end of list - DWM ********** !!!!!!!!!!!!!!!!!!!!!!! ");
+            }
+//          const std::string obj_meta { boost::any_cast<std::string>(*it) }; ++it;
+            std::string obj_meta {  "{}" };
 
             invoke_indexing_event_metadata(
                 rei,
