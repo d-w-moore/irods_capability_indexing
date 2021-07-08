@@ -377,6 +377,13 @@ namespace {
 		    idx.schedule_metadata_purge_for_recursive_rm_object (  obj_inp->collName );
                 }
             }
+            else if (_rn == "pep_api_atomic_apply_metadata_operations_post") {
+		    auto it = _args.begin();
+                    while (it != _args.end()) {
+                      auto ty = (it++)->type().name();
+                      irods::log (LOG_NOTICE, fmt::format("{}",boost::core::demangle(ty)));
+                    }
+            }
         }
         catch(const boost::bad_any_cast& _e) {
             THROW(
