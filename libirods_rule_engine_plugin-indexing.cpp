@@ -13,6 +13,7 @@
 
 #include "utilities.hpp"
 #include "indexing_utilities.hpp"
+#include <boost/core/demangle.hpp>
 
 #undef LIST
 
@@ -23,6 +24,7 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <fmt/format.h>
 
 // =-=-=-=-=-=-=-
 // boost includes
@@ -511,6 +513,7 @@ irods::error rule_exists(
     const std::string& _rn,
     bool&              _ret) {
     const std::set<std::string> rules{
+                                    "pep_api_atomic_apply_metadata_operations_post",
                                     "pep_api_data_obj_open_post",
                                     "pep_api_data_obj_create_post",
                                     "pep_api_data_obj_repl_post",

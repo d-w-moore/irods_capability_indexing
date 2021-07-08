@@ -37,6 +37,7 @@ target_include_directories(
     ${IRODS_EXTERNALS_FULLPATH_BOOST}/include
     ${IRODS_EXTERNALS_FULLPATH_JSON}/include
     ${IRODS_EXTERNALS_FULLPATH_JANSSON}/include
+    ${IRODS_EXTERNALS_FULLPATH_FMT}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     /opt/irods-externals/elasticlient0.1.0-1/include/
     /opt/irods-externals/cpr1.3.0-1/include/
@@ -49,6 +50,7 @@ target_link_libraries(
     ${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_filesystem.so
     ${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_regex.so
     ${IRODS_EXTERNALS_FULLPATH_BOOST}/lib/libboost_system.so
+    ${IRODS_EXTERNALS_FULLPATH_FMT}/lib/libfmt.so     
     /opt/irods-externals/elasticlient0.1.0-1/lib/libelasticlient.so
 
     /opt/irods-externals/elasticlient0.1.0-1/lib/libjsoncpp.so
