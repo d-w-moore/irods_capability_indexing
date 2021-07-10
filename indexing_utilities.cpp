@@ -25,6 +25,7 @@
 #include <random>
 
 #include "json.hpp"
+#include "cpp_json_kw.hpp"
 
 
 int _delayExec(
@@ -284,6 +285,8 @@ namespace irods {
                         }
                         if ( ! (is_collection && _index_type == "full_text" )) {
 
+                            rodsLog(LOG_NOTICE,"DWM -- in %s , do obj [%s] with policy_name [%s]",__func__,  path.string().c_str(), policy_name.c_str());
+
                             schedule_policy_event_for_object(
                                 policy_name,
                                 path.string(),
@@ -308,7 +311,7 @@ namespace irods {
         } // schedule_policy_events_for_collection
 
         /*
-        == ////  void indexer::schedule_{INDEX-TYPE}_{INDEX-EVENT}_event ////
+        == ////  void indexer::schedule_{INDEX-TYPE}_{EVENT}_event ////
         ==  for combinations of INDEX-TYPE => ( full_text, metadata )
         ==                  and EVENT      => ( indexing, purge )
         ==
@@ -448,7 +451,8 @@ namespace irods {
                                 _attribute,
                                 _value,
                                 _units,
-                                _opt_ID);
+                                {{ "_obj_optional_ID", _opt_ID}} // _extra_options
+                            );
                             processed_indicies.push_back(index_name+index_type);
                         }
                     } // for row
@@ -565,12 +569,17 @@ namespace irods {
             const std::string& _attribute,
             const std::string& _value,
             const std::string& _units,
-            const std::string& obj_optional_ID) {
+            const nlohmann::json & _extra_options // = {}
+        ) {
+
             using json = nlohmann::json;
+
+            const auto & [_ID_bool, _obj_optional_ID] = kws_get<std::string>(_extra_options, "_obj_optional_ID");
+
             json rule_obj;
             rule_obj["rule-engine-operation"]     = _event;
             rule_obj["rule-engine-instance-name"] = config_.instance_name_;
-            rule_obj["object-path"]               = obj_optional_ID.empty() ? _object_path : obj_optional_ID;
+            rule_obj["object-path"]               = _ID_bool && ! (*_obj_optional_ID).empty() ? *_obj_optional_ID : _object_path;
             rule_obj["user-name"]                 = _user_name;
             rule_obj["indexer"]                   = _indexer;
             rule_obj["index-name"]                = _index_name;

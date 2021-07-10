@@ -7,6 +7,7 @@
 #include <boost/any.hpp>
 #include <string>
 
+#include "json.hpp"
 #include "rcMisc.h"
 #include "configuration.hpp"
 
@@ -109,7 +110,7 @@ namespace irods {
                 const std::string& _attribute = {},
                 const std::string& _value = {},
                 const std::string& _units = {},
-                const std::string& obj_optional_ID = {}
+                const nlohmann::json & _extra_options = {}
             );
 
             std::vector<std::string> get_indexing_resource_names();
