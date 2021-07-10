@@ -1,11 +1,10 @@
-#include <iostream>
+#ifndef cpp_json_kw__hpp
+#define cpp_json_kw__hpp
+
 #include <optional>
 #include <string>
-#include <json.hpp>
+#include "json.hpp"
 #include <stdexcept>
-#include <complex>
-
-#include <iostream>
 
 using nlohmann::json;
 
@@ -13,7 +12,7 @@ template <typename T>
 struct mapped_json_value {bool success ; std::optional<T> value;};
 
 template <typename T>
-auto kws_get(const json &j, const std::string & key) -> mapped_json_value<T>
+auto kws_get(const nlohmann::json &j, const std::string & key) -> mapped_json_value<T>
 {
    if (auto iter = j.find(key); iter != j.end()) {
        try {
@@ -27,8 +26,13 @@ auto kws_get(const json &j, const std::string & key) -> mapped_json_value<T>
    return {};
 }
 
+/* // SAMPLE USAGE
+ *
+#include <iostream>
 int main (int argc, char** argv)
 { 
+    using json = nlohmann::json;
+
     json J {
         {"hello", 3.3 },
     };
@@ -41,5 +45,8 @@ int main (int argc, char** argv)
         std::cout << "no  " << std::endl;    
         //_optional;
     }
-
 }
+ *
+ */
+
+#endif // cpp_json_kw__hpp
