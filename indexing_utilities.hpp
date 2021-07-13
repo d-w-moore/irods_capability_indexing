@@ -136,8 +136,14 @@ namespace irods {
 
             public: const configuration& get_config() { return config_; }
         }; // class indexer
+
+        extern const char * GLOBAL_ID(void);
+
     } // namespace indexing
+
+
 } // namespace irods
+
 
 #endif // INDEXING_UTILITIES_HPP
 

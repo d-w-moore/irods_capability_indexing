@@ -24,6 +24,7 @@
 #include <vector>
 #include <tuple>
 #include <string>
+#include <stdexcept>
 #include <fmt/format.h>
 #include <irods_log.hpp>
 
@@ -550,7 +551,7 @@ TRACE_LOG();
             const auto s = fsvr::status(*_rei->rsComm,  fs::path{_object_path});
             
 
-            if (fsvr::is_data_object(s)) {
+            if (fsvr::is_data_object(s)) {  // - In new schema
                 query_str =  boost::str(
                     boost::format("SELECT META_DATA_ATTR_NAME, META_DATA_ATTR_VALUE, META_DATA_ATTR_UNITS, DATA_ID"
                                   " WHERE DATA_NAME = '%s' AND COLL_NAME = '%s'")
@@ -639,11 +640,23 @@ TRACE_LOG();
 } // namespace
 
 
+const char * irods::indexing::GLOBAL_ID( const std :: string & s = "" )
+{
+    static std::string _global_UUID {};
+    if (s.size() != 0  && _global_UUID.size() == 0) {
+        _global_UUID = s;
+    }
+    if (0 == _global_UUID.size()) { throw runtime_error{"null GLOBAL_ID"}; }
+    return _global_UUID.c_str();
+}
+ 
+
 irods::error start(
     irods::default_re_ctx&,
     const std::string& _instance_name ) {
     RuleExistsHelper::Instance()->registerRuleRegex("pep_api_.*");
     config = std::make_unique<irods::indexing::configuration>(_instance_name);
+    irods::indexing::GLOBAL_ID( random_uuid() );
     return SUCCESS();
 } // start
 

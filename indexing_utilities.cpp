@@ -23,10 +23,17 @@
 #include <boost/format.hpp>
 #include <boost/lexical_cast.hpp>
 #include <random>
+#include <map>
+#include <set>
+#include <fmt/format.h>
+#include <algorithm>
+#include <iterator>
 
 #include "json.hpp"
 #include "cpp_json_kw.hpp"
+#include "gen_uuid.hpp"
 
+using irods::indexing::GLOBAL_ID;
 
 int _delayExec(
     const char *inActionCall,
@@ -287,6 +294,10 @@ namespace irods {
 
                             rodsLog(LOG_NOTICE,"DWM -- in %s , do obj [%s] with policy_name [%s]",__func__,  path.string().c_str(), policy_name.c_str());
 
+                            nlohmann::json _extra_options{{ '_global_ID', GLOBAL_ID() }};
+
+                            if ( config_.throttle != "" ) _extra_options["throttle"] = std::stoul( config_.throttle );
+
                             schedule_policy_event_for_object(
                                 policy_name,
                                 path.string(),
@@ -295,7 +306,9 @@ namespace irods {
                                 _indexer,
                                 _index_name,
                                 _index_type,
-                                generate_delay_execution_parameters());
+                                generate_delay_execution_parameters(), 
+                                /*AVU:*/ {},{},{}, 
+                                _extra_options);
                         }
                     }
                     catch(const exception& _e) {
@@ -574,7 +587,11 @@ namespace irods {
 
             using json = nlohmann::json;
 
+            const auto & [_GID_bool, _global_ID] = kws_get<std::string>(_extra_options, "_global_ID");
+
             const auto & [_ID_bool, _obj_optional_ID] = kws_get<std::string>(_extra_options, "_obj_optional_ID");
+
+            const auto LclId = "LOCAL_ID:"s;
 
             json rule_obj;
             rule_obj["rule-engine-operation"]     = _event;
@@ -589,6 +606,28 @@ namespace irods {
             rule_obj["value"]                     = _value;
             rule_obj["units"]                     = _units;
 
+            using stringMap = std::map<std::string, std::string>;
+            using stringSet = std::set<std::string>;
+            using stringVec = std::vector<std::string>;
+
+            static stringMap rule_map;
+            size_t s = rule_map.size();
+
+            const auto & [_TH_bool, _throttle] = kws_get<unsigned>(_extra_options, "throttle");
+
+            if (_GID_bool) { 
+                if (_TH_bool && *_throttle > 0 && s >= *_throttle ) {
+                    rule_obj["global-uuid"] = *_global_ID;
+                    while (s > *_throttle / 2) {
+                        sleep(1);
+                        auto query {comm_, fmt::format("count(RULE_EXEC_ID) where RULE_EXEC_NAME like '%{}%'", *_global_ID), 1};
+                        for (const auto & row :  query) { s = std::stoul(row[0]); }
+                    }
+            }
+
+            auto newid = random_uuid();
+            rule_obj ["local-uuid"] =  LclId + newid;
+
             const auto delay_err = _delayExec(
                                        rule_obj.dump().c_str(),
                                        "",
@@ -602,6 +641,42 @@ namespace irods {
                     _indexer %
                     _index_type);
             }
+            else {
+
+                // - Pare down `rule_map' to currently scheduled jobs
+                // -
+                if (_GID_bool && _TH_bool && *_throttle > 0) {  // if we are limiting # of running delay jobs ...
+
+                    stringMap new_map{}, rvs_map{};
+                    stringVec rvs_vec{};
+                    static stringSet rvs_set{};
+                    rvs_set.insert( newid );                                // Record Local UUID for successfully launched delay job.
+                    if (rvs_set.size()) {
+                    if (*_throttle < rvs_set.size() + rule_map.size()) {    // Is accounted number of "our" running rules > threshold?
+
+                        auto query { comm_, fmt::format("RULE_EXEC_ID, RULE_EXEC_NAME where RULE_EXEC_NAME like '%{}%'", *_global_ID) };
+                                           
+                        for (const auto & row : query) {      // search for still-running Local UUID'S
+                            auto it = rule_map.find(row[0]);
+                            if (it != rule_map.end()) { new_map[ it->first ] = it->second; continue; }  // Copy existing record if any...
+                            if (auto j = (row[1].find(LclId); j != std::string::npos())) {              // else look for Local UUID in rule name.
+                                auto s = row[1].substr(j+LclId.size(),36); // 36 is the length of UUID string
+                                rvs_map[s]=row[0]; // local_uuid -> RULE_ID
+                                rvs_vec.push_back(s); // rvs_vec holds the keys of `rvs_map'
+                            }
+                        }
+                        std::sort( rvs_vec.begin(), rvs_vec.end() );  // =-------=  get intersection of accumulated and detected local UUIDs
+                        stringVec new_vec {};
+                        std::set_intersection ( rvs_set.begin(), rvs_set.end(), rvs_vec.begin(), rvs_vec.end(), std::back_inserter( new_vec ));
+                        for (const auto & uuid: new_vec) {
+                            new_map [rvs_map[uuid]] = uuid;
+                        }
+                        rule_map = std::move(new_map);   // Update `rule_map' with currently valid (RULE_ID => LOCAL_UUID) entries
+                        rvs_set.clear();
+                    }
+                    }
+                }
+            }
 
             rodsLog(
                 config_.log_level,
@@ -609,6 +684,8 @@ namespace irods {
                 _object_path.c_str(),
                 _indexer.c_str(),
                 _index_type.c_str());
+
+
 
         } // schedule_policy_event_for_object
     } // namespace indexing

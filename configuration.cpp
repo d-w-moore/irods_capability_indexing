@@ -19,6 +19,7 @@ namespace irods {
                 capture_parameter("minimum_delay_time", minimum_delay_time);
                 capture_parameter("maximum_delay_time", maximum_delay_time);
                 capture_parameter("delay_parameters",   delay_parameters);
+                capture_parameter("throttle", throttle);
             } catch ( const boost::bad_any_cast& _e ) {
                 THROW( INVALID_ANY_CAST, _e.what() );
             } catch ( const exception _e ) {

@@ -1,7 +1,7 @@
 #ifndef __es_detail_hpp
 #define __es_detail_hpp
 
-#include "fmt/format.h"
+#include <fmt/format.h>
 #include <utility>
 #include <map>
 #include <list>
