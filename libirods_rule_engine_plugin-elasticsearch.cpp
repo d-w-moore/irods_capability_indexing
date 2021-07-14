@@ -39,6 +39,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <optional>
 
 
 namespace {
@@ -300,6 +301,29 @@ TRACE_LOG();
         }
 
     } // get_object_index_id
+
+    void get_metadata_for_object_index_id(
+        ruleExecInfo_t*    _rei,
+        std::string _obj_id,
+        bool _is_coll,
+        std::optional<nlohmann::json> & _out
+    )
+    {
+        if (!_out) return;
+        using nlohmann::json;
+        auto & avus_out = *_out = json::array();
+        const std::string query_str = _is_coll ?
+            fmt::format("SELECT META_COLL_ATTR_NAME, META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS"
+                          "WHERE COLL_ID = '{}' ",_obj_id) :
+            fmt::format("SELECT META_DATA_ATTR_NAME, META_DATA_ATTR_VALUE, META_DATA_ATTR_UNITS"
+                          " WHERE DATA_ID = '{}' " , _obj_id);
+            irods::query<rsComm_t> qobj{_rei->rsComm, query_str};
+            for (const auto & row : avus) {
+                avus_out  +=  {  { "attribute", row[0] },
+                                 { "value",     row[1] },
+                                 { "unit",      row[2] }  };
+            }
+    } // update_metadata_for_index
 
     void update_object_metadata(
         ruleExecInfo_t*    _rei,
