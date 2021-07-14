@@ -137,7 +137,7 @@ namespace irods {
             public: const configuration& get_config() { return config_; }
         }; // class indexer
 
-        extern const char * GLOBAL_ID(void);
+        extern const char * GLOBAL_ID(const std::string & initealizer = "");
 
     } // namespace indexing
 

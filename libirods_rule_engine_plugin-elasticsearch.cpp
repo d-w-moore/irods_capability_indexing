@@ -318,7 +318,7 @@ TRACE_LOG();
             fmt::format("SELECT META_DATA_ATTR_NAME, META_DATA_ATTR_VALUE, META_DATA_ATTR_UNITS"
                           " WHERE DATA_ID = '{}' " , _obj_id);
             irods::query<rsComm_t> qobj{_rei->rsComm, query_str};
-            for (const auto & row : avus) {
+            for (const auto & row : qobj) {
                 avus_out  +=  {  { "attribute", row[0] },
                                  { "value",     row[1] },
                                  { "unit",      row[2] }  };

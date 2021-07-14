@@ -36,6 +36,7 @@
 #include <boost/optional.hpp>
 
 #include "json.hpp"
+#include "gen_uuid.hpp"
 
 #include "objDesc.hpp"
 
@@ -639,17 +640,19 @@ TRACE_LOG();
 
 } // namespace
 
+namespace irods { namespace indexing {
 
-const char * irods::indexing::GLOBAL_ID( const std :: string & s = "" )
-{
-    static std::string _global_UUID {};
-    if (s.size() != 0  && _global_UUID.size() == 0) {
-        _global_UUID = s;
+    const char *GLOBAL_ID( const std::string & s /*=""*/ )
+    {
+        static std::string _global_UUID {};
+        if (s.size() != 0  && _global_UUID.size() == 0) {
+            _global_UUID = s;
+        }
+        if (0 == _global_UUID.size()) { throw std::runtime_error{"null GLOBAL_ID"}; }
+        return _global_UUID.c_str();
     }
-    if (0 == _global_UUID.size()) { throw runtime_error{"null GLOBAL_ID"}; }
-    return _global_UUID.c_str();
-}
- 
+
+}} // end namespace
 
 irods::error start(
     irods::default_re_ctx&,

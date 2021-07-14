@@ -32,6 +32,9 @@
 #include "json.hpp"
 #include "cpp_json_kw.hpp"
 #include "gen_uuid.hpp"
+#include "irods_log.hpp"
+
+using namespace std::literals;
 
 using irods::indexing::GLOBAL_ID;
 
@@ -294,9 +297,15 @@ namespace irods {
 
                             rodsLog(LOG_NOTICE,"DWM -- in %s , do obj [%s] with policy_name [%s]",__func__,  path.string().c_str(), policy_name.c_str());
 
-                            nlohmann::json _extra_options{{ '_global_ID', GLOBAL_ID() }};
+                            nlohmann::json _extra_options{{ "_global_ID", GLOBAL_ID() }};
 
-                            if ( config_.throttle != "" ) _extra_options["throttle"] = std::stoul( config_.throttle );
+                            if (config_.throttle != "") {
+                                try { _extra_options["throttle"] = std::stoi( config_.throttle );}
+                                catch(const std::exception &e) {
+                                    irods::log(LOG_DEBUG,fmt::format("Error interpreting 'throttle' configuration string '{}' as int : {}",
+                                      config_.throttle, e.what()));
+                                }
+                            }
 
                             schedule_policy_event_for_object(
                                 policy_name,
@@ -613,16 +622,17 @@ namespace irods {
             static stringMap rule_map;
             size_t s = rule_map.size();
 
-            const auto & [_TH_bool, _throttle] = kws_get<unsigned>(_extra_options, "throttle");
+            const auto & [_TH_bool, _throttle] = kws_get<int>(_extra_options, "throttle");
 
-            if (_GID_bool) { 
+            if (_GID_bool) {
                 if (_TH_bool && *_throttle > 0 && s >= *_throttle ) {
                     rule_obj["global-uuid"] = *_global_ID;
                     while (s > *_throttle / 2) {
                         sleep(1);
-                        auto query {comm_, fmt::format("count(RULE_EXEC_ID) where RULE_EXEC_NAME like '%{}%'", *_global_ID), 1};
-                        for (const auto & row :  query) { s = std::stoul(row[0]); }
+                        irods::query Query {comm_, fmt::format("count(RULE_EXEC_ID) where RULE_EXEC_NAME like '%{}%'", *_global_ID), 1};
+                        for (const auto & row : Query) { s = std::stoul(row[0]); }
                     }
+                }
             }
 
             auto newid = random_uuid();
@@ -652,14 +662,14 @@ namespace irods {
                     static stringSet rvs_set{};
                     rvs_set.insert( newid );                                // Record Local UUID for successfully launched delay job.
                     if (rvs_set.size()) {
-                    if (*_throttle < rvs_set.size() + rule_map.size()) {    // Is accounted number of "our" running rules > threshold?
+                    if (*_throttle < rvs_set.size() + rule_map.size()) {    // Is (# of "our" running rules) > threshold?
 
-                        auto query { comm_, fmt::format("RULE_EXEC_ID, RULE_EXEC_NAME where RULE_EXEC_NAME like '%{}%'", *_global_ID) };
+                        irods::query Query { comm_, fmt::format("RULE_EXEC_ID, RULE_EXEC_NAME where RULE_EXEC_NAME like '%{}%'", *_global_ID) };
                                            
-                        for (const auto & row : query) {      // search for still-running Local UUID'S
+                        for (const auto & row : Query) {      // search for still-running Local UUID'S
                             auto it = rule_map.find(row[0]);
                             if (it != rule_map.end()) { new_map[ it->first ] = it->second; continue; }  // Copy existing record if any...
-                            if (auto j = (row[1].find(LclId); j != std::string::npos())) {              // else look for Local UUID in rule name.
+                            if (auto j = row[1].find(LclId); j != std::string::npos) {              // else look for Local UUID in rule name.
                                 auto s = row[1].substr(j+LclId.size(),36); // 36 is the length of UUID string
                                 rvs_map[s]=row[0]; // local_uuid -> RULE_ID
                                 rvs_vec.push_back(s); // rvs_vec holds the keys of `rvs_map'

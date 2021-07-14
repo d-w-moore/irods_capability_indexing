@@ -68,7 +68,7 @@ namespace irods {
             std::string minimum_delay_time{"1"};
             std::string maximum_delay_time{"30"};
             std::string delay_parameters{"<EF>60s DOUBLE UNTIL SUCCESS OR 5 TIMES</EF>"};
-            std::string throttle{};
+            std::string throttle{"0"};
             int log_level{LOG_DEBUG};
             const std::string instance_name_{};
             explicit configuration(const std::string& _instance_name);
