@@ -267,7 +267,9 @@ TRACE_LOG();
 
     std::string get_object_index_id(
         ruleExecInfo_t*    _rei,
-        const std::string& _object_path) {
+        const std::string& _object_path,
+        char *iscoll = nullptr
+    ) {
         boost::filesystem::path p{_object_path};
         std::string coll_name = p.parent_path().string();
         std::string data_name = p.filename().string();
@@ -275,10 +277,12 @@ TRACE_LOG();
         namespace fsvr = irods::experimental::filesystem::server;
         std::string query_str;
         if (fsvr::is_collection( *_rei->rsComm, fs::path{_object_path} )) {
+            if (iscoll) *iscoll = '\1';
             query_str = boost::str( boost::format("SELECT COLL_ID WHERE COLL_NAME = '%s'")
                                         % _object_path );
         }
         else {
+            if (iscoll) *iscoll = '\0';
             query_str = boost::str( boost::format("SELECT DATA_ID WHERE DATA_NAME = '%s' AND COLL_NAME = '%s'")
                                         % data_name
                                         % coll_name );
@@ -309,9 +313,8 @@ TRACE_LOG();
         std::optional<nlohmann::json> & _out
     )
     {
-        if (!_out) return;
-        using nlohmann::json;
-        auto & avus_out = *_out = json::array();
+        if (!_out || !_out->is_array()) _out = nlohmann::json::array();
+        auto & avus_out = *_out;
         const std::string query_str = _is_coll ?
             fmt::format("SELECT META_COLL_ATTR_NAME, META_COLL_ATTR_VALUE, META_COLL_ATTR_UNITS"
                           "WHERE COLL_ID = '{}' ",_obj_id) :
@@ -549,19 +552,25 @@ TRACE_LOG();
         const std::string& _value,
         const std::string& _unit,
         const std::string& _index_name,
-        const nlohmann::json & obj_meta ) {
+        nlohmann::json & obj_meta ) {
 
         irods::log( LOG_NOTICE , fmt::format("DWM - json imported {}",obj_meta.dump()) );
 
         try {
+            char c{};
             elasticlient::Client client{config->hosts_};
-            auto object_id = get_object_index_id( _rei, _object_path);
+            auto object_id = get_object_index_id( _rei, _object_path, &c);
             const std::string md_index_id{
                                   get_metadata_index_id(
                                       object_id,
                                       _attribute,
                                       _value,
                                       _unit)};
+
+            std::optional<nlohmann::json> jsonarray;
+            get_metadata_for_object_index_id( _rei, object_id, c, jsonarray );
+            obj_meta ["metadataEntries"] = *jsonarray; // dwm - check
+/*  // jsonarray content contains object AVUs 
             std::string payload{
                             boost::str(
                             boost::format(
@@ -569,9 +578,11 @@ TRACE_LOG();
                             % _object_path
                             % escape_string( _attribute )
                             % escape_string( _value )
-                            % escape_string( _unit)       )} ;
+                            % escape_string( _unit)       )} ; */
 
-            const cpr::Response response = client.index(_index_name, "text", md_index_id, payload);
+            // -- const cpr::Response response = client.index(_index_name, "text", md_index_id, payload);
+            const cpr::Response response = client.index(_index_name, "text", object_id, obj_meta.dump());
+
             if(response.status_code != 200 && response.status_code != 201) {
                 THROW(
                     SYS_INTERNAL_ERR,
@@ -769,11 +780,17 @@ irods::error exec_rule(
             const std::string value{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string unit{ boost::any_cast<std::string>(*it) }; ++it;
             const std::string index_name{ boost::any_cast<std::string>(*it) }; ++it;
+
+            std::string obj_meta_str {  "{}" };
+
+            // take this out ---------------------> 
             if (it == _args.end()) {
                   rodsLog( LOG_NOTICE, "!!!!!!!!!!!!!!!!!!!!!!111 end of list - DWM ********** !!!!!!!!!!!!!!!!!!!!!!! ");
             }
-//          const std::string obj_meta { boost::any_cast<std::string>(*it) }; ++it;
-            std::string obj_meta {  "{}" };
+            else // dwm <--------------------------
+                obj_meta_str =  boost::any_cast<std::string>(*it++);
+
+            json obj_meta = nlohmann::json::parse(obj_meta_str);
 
             invoke_indexing_event_metadata(
                 rei,
@@ -782,7 +799,7 @@ irods::error exec_rule(
                 value,
                 unit,
                 index_name,
-                json::parse(obj_meta)
+                obj_meta
             );
         }
         else if(_rn == metadata_purge_policy) {
